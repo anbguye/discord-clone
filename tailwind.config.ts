@@ -65,7 +65,12 @@ const config: Config = {
   			lg: 'var(--radius)',
   			md: 'calc(var(--radius) - 2px)',
   			sm: 'calc(var(--radius) - 4px)'
-  		}
+  		},
+		spacing: {
+			'size-6': '1.5rem', // Custom size-6 (24px)
+			'size-9': '2.25rem', // Custom size-9 (36px)
+			'size-12': '3rem',   // Custom size-12 (48px)
+		}
   	}
   },
   plugins: [require("tailwindcss-animate")],
