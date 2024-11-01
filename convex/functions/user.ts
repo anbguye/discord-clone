@@ -1,22 +1,19 @@
 import {
   internalMutation,
+  QueryCtx,
   MutationCtx,
   query,
-  QueryCtx,
 } from "../_generated/server";
 import { v } from "convex/values";
 
 export const get = query({
-  handler: async (ctx) => {
-    try {
-      return await getCurrentUser(ctx);
-    } catch (error) {
-      console.error("Error getting user: ", error);
-      return null;
-    }
+  handler: async (ctx: QueryCtx | MutationCtx) => {
+    return await getCurrentUser(ctx);
   },
 });
 
+// - internalmutation: can't call from frontend,
+// but can call from other function inside the API
 export const upsert = internalMutation({
   args: {
     username: v.string(),
@@ -24,7 +21,10 @@ export const upsert = internalMutation({
     clerkId: v.string(),
   },
   handler: async (ctx, args) => {
-    const user = await getUserByClerkId(ctx, args.clerkId);
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", args.clerkId))
+      .unique();
 
     if (user) {
       await ctx.db.patch(user._id, {
@@ -42,29 +42,28 @@ export const upsert = internalMutation({
 });
 
 export const remove = internalMutation({
-  args: {
-    clerkId: v.string(),
-  },
-  handler: async (ctx, args) => {
-    const user = await getUserByClerkId(ctx, args.clerkId);
+  args: { clerkId: v.string() },
+  handler: async (ctx, { clerkId }) => {
+    const user = await getUserByClerkId(ctx, clerkId);
     if (user) {
       await ctx.db.delete(user._id);
     }
   },
 });
 
-const getCurrentUser = async (ctx: QueryCtx | MutationCtx) => {
+export const getCurrentUser = async (ctx: QueryCtx | MutationCtx) => {
   const identity = await ctx.auth.getUserIdentity();
-  console.log("identity", identity);
   if (!identity) {
-    throw new Error(`Unauthorized @${getCurrentUser.name}`);
+    return null;
   }
-  return getUserByClerkId(ctx, identity.subject);
+  return await getUserByClerkId(ctx, identity.subject);
 };
 
-const getUserByClerkId = (ctx: QueryCtx | MutationCtx, clerkId: string) => {
-  console.log("clerkId", clerkId);
-  return ctx.db
+const getUserByClerkId = async (
+  ctx: QueryCtx | MutationCtx,
+  clerkId: string
+) => {
+  return await ctx.db
     .query("users")
     .withIndex("by_clerk_id", (q) => q.eq("clerkId", clerkId))
     .unique();
